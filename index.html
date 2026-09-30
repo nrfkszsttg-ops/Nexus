@@ -1,0 +1,322 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="SENTINEL">
+<meta name="theme-color" content="#0d0e10">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; connect-src https://api.mistral.ai https://*.wikipedia.org https://hn.algolia.com; base-uri 'none'; form-action 'none'">
+<title>SENTINEL AI</title>
+<style>
+:root{--bg:#0d0e10;--p:#16181b;--p2:#1d2024;--ln:#2a2e33;--tx:#e9ebed;--mu:#8b9299;--ac:#c9d1d9;--ok:#5fb37c;--wa:#d1a44a;--er:#d0625a;--r:6px}
+*{box-sizing:border-box}html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--tx);font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;display:flex;padding-top:env(safe-area-inset-top)}
+button,input,select,textarea{font:inherit;color:inherit}
+button{background:var(--p2);border:1px solid var(--ln);border-radius:var(--r);padding:9px 14px;cursor:pointer;min-height:40px}
+button:hover{border-color:var(--mu)}button.pr{background:var(--tx);color:#111;border-color:var(--tx)}button.dg{color:var(--er)}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--ac);outline-offset:1px}
+input,select,textarea{background:var(--bg);border:1px solid var(--ln);border-radius:var(--r);padding:9px 11px;width:100%;min-height:40px}
+label{display:block;color:var(--mu);font-size:13px;margin:10px 0 4px}
+nav{width:210px;background:var(--p);border-right:1px solid var(--ln);padding:16px 10px;display:flex;flex-direction:column;gap:2px;flex-shrink:0}
+.brand{display:flex;gap:10px;align-items:center;padding:4px 8px 16px}.brand b{display:block;letter-spacing:.06em}.brand small{color:var(--mu);font-size:10px}
+nav button{background:none;border:0;text-align:left;color:var(--mu);width:100%}nav button.on{background:var(--p2);color:var(--tx)}
+main{flex:1;min-width:0;overflow:auto;padding:20px;padding-bottom:calc(20px + env(safe-area-inset-bottom))}
+h2{margin:0 0 4px;font-size:20px}h3{margin:0 0 8px;font-size:14px;color:var(--mu);font-weight:500}.sub{color:var(--mu);margin:0 0 16px}
+.g{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));margin-bottom:12px}
+.c{background:var(--p);border:1px solid var(--ln);border-radius:var(--r);padding:14px;margin-bottom:12px}.g .c{margin:0}
+.big{font-size:28px;font-weight:600}.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.pill{display:inline-flex;gap:6px;align-items:center;border:1px solid var(--ln);border-radius:20px;padding:3px 10px;font-size:12px;color:var(--mu)}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--ok)}.dot.off{background:var(--er)}.dot.w{background:var(--wa)}
+.mono{font-family:ui-monospace,Menlo,monospace;font-size:12px;color:var(--mu)}
+.tag{font-size:11px;border:1px solid var(--ln);border-radius:4px;padding:1px 6px;color:var(--mu)}
+.HIGH,.CRITICAL,.CONTRADICTED{color:var(--er);border-color:var(--er)}.MEDIUM,.CLAIM,.UNVERIFIED{color:var(--wa);border-color:var(--wa)}.FACT{color:var(--ok);border-color:var(--ok)}
+.msg{padding:10px 0;border-bottom:1px solid var(--ln);white-space:pre-wrap;overflow-wrap:anywhere}.msg .who{font-size:11px;color:var(--mu);letter-spacing:.08em;margin-bottom:3px}
+.chat{display:flex;flex-direction:column;height:calc(100vh - 40px)}.chat .log{flex:1;overflow:auto}
+.demo{border:1px dashed var(--wa);color:var(--wa);padding:6px 10px;border-radius:var(--r);font-size:12px;margin-bottom:12px}
+a{color:var(--ac)}.src{font-size:13px;margin:4px 0;overflow-wrap:anywhere}
+.tl{border-left:1px solid var(--ln);margin-left:4px;padding-left:12px}.tl div{margin-bottom:6px}
+@media(max-width:800px){body{flex-direction:column-reverse}
+nav{width:100%;flex-direction:row;overflow-x:auto;border-right:0;border-top:1px solid var(--ln);padding:6px 6px calc(6px + env(safe-area-inset-bottom))}
+nav .brand{display:none}nav button{width:auto;white-space:nowrap;text-align:center}main{padding:14px}.chat{height:calc(100vh - 130px)}}
+@media print{nav,.noprint{display:none!important}body{background:#fff;color:#000}.c{border-color:#ccc;background:#fff}}
+@media(prefers-reduced-motion:no-preference){.pulse{animation:p 1.2s infinite}@keyframes p{50%{opacity:.35}}}
+</style>
+</head>
+<body>
+<nav id="nav"></nav>
+<main id="main"></main>
+<script>
+"use strict";
+/* ---------- État local (localStorage, uniquement sur cet appareil) ---------- */
+const KEY="sentinel_ai_v1";
+const DEF={mem:[],msgs:[],reports:[],alerts:[],watch:[],log:[],searches:[],set:{key:"",model:"mistral-small-latest",temp:0.3,max:1200,demo:false}};
+let DB=load();
+function load(){try{return Object.assign(structuredClone(DEF),JSON.parse(localStorage.getItem(KEY)||"{}"))}catch{return structuredClone(DEF)}}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(DB))}catch{alert("Stockage plein ou bloqué.")}}
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+const now=()=>new Date().toLocaleTimeString("fr-FR");
+const online=()=>navigator.onLine;
+function log(action,module,result="OK",status="OK"){DB.log.push({ts:new Date().toISOString(),action,module,result,status});DB.log=DB.log.slice(-300);save()}
+const safeUrl=u=>/^https?:\/\//i.test(u)?u:"#";
+
+/* ---------- Mistral (appel direct depuis le navigateur) ---------- */
+async function mistral(messages,json=false){
+  const s=DB.set;
+  if(s.demo)return json?JSON.stringify(DEMO_ANALYSIS):"[DEMO DATA] Réponse simulée : le mode démo est actif, aucun appel réel n'est effectué.";
+  if(!online())throw new Error("OFFLINE : Internet indisponible.");
+  if(!s.key)throw new Error("Clé Mistral absente : ajoutez-la dans Settings → AI.");
+  const ctl=new AbortController(),t=setTimeout(()=>ctl.abort(),45000);
+  try{
+    const r=await fetch("https://api.mistral.ai/v1/chat/completions",{method:"POST",signal:ctl.signal,
+      headers:{"Content-Type":"application/json",Authorization:"Bearer "+s.key},
+      body:JSON.stringify({model:s.model,messages,temperature:+s.temp,max_tokens:+s.max,...(json?{response_format:{type:"json_object"}}:{})})});
+    if(r.status===401)throw new Error("Clé Mistral refusée (401).");
+    if(r.status===429)throw new Error("Quota ou limite de requêtes dépassé (429).");
+    if(!r.ok)throw new Error("Erreur Mistral "+r.status);
+    const d=await r.json();const c=d?.choices?.[0]?.message?.content;
+    if(!c)throw new Error("Réponse Mistral invalide.");
+    return c;
+  }catch(e){if(e.name==="AbortError")throw new Error("Délai dépassé (timeout).");throw e}
+  finally{clearTimeout(t)}
+}
+
+/* ---------- Recherche web : fournisseurs interchangeables ---------- */
+const strip=h=>String(h).replace(/<[^>]+>/g," ").replace(/&quot;/g,'"').replace(/&amp;/g,"&").replace(/\s+/g," ").trim();
+const PROVIDERS={
+  async wikipedia(q,n,lang){
+    const r=await fetch(`https://${lang}.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(q)}&srlimit=${n}&format=json&origin=*`);
+    if(!r.ok)throw new Error("Wikipedia "+r.status);
+    return((await r.json()).query?.search||[]).map(x=>({source:"Wikipedia "+lang.toUpperCase(),title:x.title,url:`https://${lang}.wikipedia.org/?curid=${x.pageid}`,snippet:strip(x.snippet),date:(x.timestamp||"").slice(0,10)}));
+  },
+  async hackernews(q,n,_l,recent){
+    const r=await fetch(`https://hn.algolia.com/api/v1/${recent?"search_by_date":"search"}?query=${encodeURIComponent(q)}&tags=story&hitsPerPage=${n}`);
+    if(!r.ok)throw new Error("HN "+r.status);
+    return((await r.json()).hits||[]).map(x=>({source:"Hacker News",title:x.title||"(sans titre)",url:x.url||"https://news.ycombinator.com/item?id="+x.objectID,snippet:`${x.points||0} points, ${x.num_comments||0} commentaires`,date:(x.created_at||"").slice(0,10)}));
+  }
+};
+async function webSearch(q,src,n,lang,recent){
+  if(DB.set.demo)return DEMO_SOURCES;
+  if(!online())throw new Error("OFFLINE : Internet indisponible.");
+  const names=src==="both"?Object.keys(PROVIDERS):[src];
+  const res=await Promise.allSettled(names.map(p=>PROVIDERS[p](q,n,lang,recent)));
+  const ok=res.filter(r=>r.status==="fulfilled").flatMap(r=>r.value);
+  if(!ok.length&&res.some(r=>r.status==="rejected"))throw new Error("Recherche indisponible : "+res.find(r=>r.status==="rejected").reason.message);
+  DB.searches.push({ts:new Date().toISOString(),q,n:ok.length});DB.searches=DB.searches.slice(-50);save();
+  return ok;
+}
+const DEMO_SOURCES=[
+ {source:"DEMO DATA",title:"Exemple : publication d'un correctif de sécurité",url:"https://example.com/demo-1",snippet:"Données fictives pour tester l'interface.",date:"2026-09-01"},
+ {source:"DEMO DATA",title:"Exemple : analyse indépendante du même correctif",url:"https://example.com/demo-2",snippet:"Données fictives, contenu simulé.",date:"2026-09-03"}];
+const DEMO_ANALYSIS={summary:"[DEMO DATA] Synthèse simulée à partir de sources fictives.",findings:[
+ {text:"Un correctif a été publié (donnée fictive).",type:"FACT",confidence:82,reason:"Confirmé par deux sources fictives.",sources:[1,2]},
+ {text:"Le correctif résoudrait toutes les failles (donnée fictive).",type:"UNVERIFIED",confidence:35,reason:"Une seule source, sans preuve.",sources:[2]}],
+ timeline:[{date:"2026-09-01",event:"Publication (démo)"},{date:"2026-09-03",event:"Analyse tierce (démo)"}],
+ unverified:["Portée réelle du correctif"],verify:["Consulter l'avis officiel de l'éditeur"]};
+
+/* ---------- Mémoire locale ---------- */
+const CATS=["PERSONNEL","PREFERENCES","SECURITE","PROJETS","CONVERSATIONS","NOTES","VEILLE"];
+const words=s=>String(s).toLowerCase().split(/[^a-zà-ÿ0-9]+/).filter(w=>w.length>3);
+function recall(q,k=3){
+  const w=words(q);if(!w.length)return[];
+  const r=DB.mem.map(m=>{const t=(m.content+" "+m.category).toLowerCase();return{m,s:w.filter(x=>t.includes(x)).length*(1+m.importance/5)}})
+    .filter(x=>x.s>0).sort((a,b)=>b.s-a.s).slice(0,k).map(x=>x.m);
+  r.forEach(m=>m.lastUsed=new Date().toISOString());if(r.length)save();return r;
+}
+function addMem(content,category="NOTES",source="manuel",importance=3){
+  DB.mem.push({id:uid(),content:content.slice(0,2000),category,created:new Date().toISOString(),lastUsed:null,importance,source});save();log("MEMORY ADDED","MEMORY",category);
+}
+
+/* ---------- Export ---------- */
+function dl(name,text,type="text/plain"){const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([text],{type}));a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),2000)}
+function mdOf(r){
+  return `# SENTINEL AI — INTELLIGENCE REPORT\n\nDate : ${r.ts}\nRequête : ${r.query}\n\n## Executive summary\n${r.summary}\n\n## Key findings\n`+
+  r.findings.map(f=>`- [${f.type}] ${f.text} (confiance ${f.confidence} %) — ${f.reason} ${(f.sources||[]).map(n=>"[S"+n+"]").join("")}`).join("\n")+
+  `\n\n## Timeline\n`+(r.timeline||[]).map(t=>`- ${t.date} : ${t.event}`).join("\n")+
+  `\n\n## Unverified information\n`+(r.unverified||[]).map(u=>"- "+u).join("\n")+
+  `\n\n## Recommendations for verification\n`+(r.verify||[]).map(u=>"- "+u).join("\n")+
+  `\n\n## Sources\n`+r.sources.map((s,i)=>`- S${i+1} ${s.title} — ${s.url} (${s.date||"date inconnue"}, ${s.source})`).join("\n");
+}
+const txtOf=r=>mdOf(r).replace(/[#*]/g,"");
+
+/* ---------- Navigation ---------- */
+const VIEWS=[["dash","Dashboard"],["agent","AI Agent"],["invest","Investigation"],["memory","Memory"],["alerts","Alerts"],["reports","Reports"],["settings","Settings"]];
+let view="dash",status="",lastReport=null;
+function nav(){
+  $("#nav").innerHTML=`<div class="brand">${LOGO}<div><b>SENTINEL AI</b><small>PERSONAL SECURITY &amp; INTELLIGENCE CENTER</small></div></div>`+
+  VIEWS.map(([k,l])=>`<button class="${k===view?"on":""}" onclick="go('${k}')">${l}</button>`).join("");
+}
+function go(v){view=v;nav();render()}
+const LOGO=`<svg width="30" height="30" viewBox="0 0 32 32" fill="none" stroke="#e9ebed" stroke-width="1.5"><path d="M16 3 27 7v8c0 7-5 12-11 14C10 27 5 22 5 15V7z"/><ellipse cx="16" cy="15" rx="6" ry="3.5"/><circle cx="16" cy="15" r="1.6" fill="#e9ebed"/><circle cx="16" cy="22" r="1" fill="#e9ebed"/></svg>`;
+function render(){$("#main").innerHTML=(DB.set.demo?`<div class="demo">DEMO DATA — mode démo actif, aucune requête réelle.</div>`:"")+VIEW[view]();if(view==="agent"){const l=$(".log");if(l)l.scrollTop=l.scrollHeight}}
+const errBox=e=>`<div class="c" style="border-color:var(--er)">⚠ ${esc(e.message||e)}</div>`;
+
+/* ---------- Vues ---------- */
+const LV=["INFO","LOW","MEDIUM","HIGH","CRITICAL"];
+const VIEW={
+dash(){
+  const act=DB.alerts.filter(a=>!a.done),top=act.reduce((m,a)=>Math.max(m,LV.indexOf(a.level)),-1);
+  const ai=DB.log.filter(l=>l.module==="AI").length;
+  return `<h2>SENTINEL AI</h2><p class="sub"><span class="pill"><span class="dot"></span>STATUS : ONLINE</span></p>
+  <div class="row" style="margin-bottom:12px">
+   <span class="pill"><span class="dot ${DB.set.demo||DB.set.key?"":"w"}"></span>AI ${DB.set.demo?"DEMO":DB.set.key?"READY":"NO KEY"}</span>
+   <span class="pill"><span class="dot ${online()?"":"off"}"></span>WEB ${online()?"ONLINE":"OFFLINE"}</span>
+   <span class="pill"><span class="dot"></span>MEMORY LOCAL</span>
+   <span class="pill"><span class="dot"></span>SECURITY CSP ON</span></div>
+  <div class="g">
+   <div class="c"><h3>THREAT LEVEL</h3><div class="big">${top<0?"NONE":LV[top]}</div><div class="mono">Indicateur tiré de vos alertes, pas une preuve de menace.</div></div>
+   <div class="c"><h3>ACTIVE ALERTS</h3><div class="big">${act.length}</div></div>
+   <div class="c"><h3>RECENT SEARCHES</h3><div class="big">${DB.searches.length}</div></div>
+   <div class="c"><h3>AI ACTIVITY</h3><div class="big">${ai}</div></div>
+   <div class="c"><h3>MEMORY ITEMS</h3><div class="big">${DB.mem.length}</div></div></div>
+  <div class="c"><h3>TIMELINE</h3><div class="tl mono">${DB.log.slice(-8).reverse().map(l=>`<div>${esc(new Date(l.ts).toLocaleTimeString("fr-FR"))} ${esc(l.action)} · ${esc(l.module)}</div>`).join("")||"Aucun événement."}</div></div>
+  <button class="pr" onclick="go('invest')">NEW INVESTIGATION</button>`;
+},
+agent(){
+  return `<div class="chat"><div class="row"><h2>AI Agent</h2><span class="pill ${status?"pulse":""}">${status||"IDLE"}</span></div>
+  <div class="log">${DB.msgs.map((m,i)=>`<div class="msg"><div class="who">${m.role==="user"?"USER":"SENTINEL"}</div>${esc(m.content)}
+   ${m.role==="assistant"?`<div class="row noprint" style="margin-top:6px"><button onclick="cp(${i})">Copy</button><button onclick="saveMsg(${i})">Save to Memory</button><button onclick="msgReport(${i})">Create Report</button>${i===DB.msgs.length-1?`<button onclick="sendChat(true)">Regenerate</button>`:""}</div>`:""}</div>`).join("")||`<p class="sub">Posez une question. Seules les mémoires pertinentes sont transmises à Mistral.</p>`}</div>
+  <div class="row noprint" style="margin-top:8px;flex-wrap:nowrap"><textarea id="ci" rows="2" placeholder="Message à SENTINEL" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat()}"></textarea><button class="pr" onclick="sendChat()">Envoyer</button></div>
+  <div class="row noprint" style="margin-top:6px"><button onclick="if(confirm('Effacer la conversation ?')){DB.msgs=[];save();render()}">Effacer</button></div></div>`;
+},
+invest(){
+  return `<h2>Web Intelligence</h2><p class="sub">Sources publiques uniquement. Chaque information est reliée à sa source et notée.</p>
+  <div class="c"><label>OBJECTIVE / SEARCH QUERY</label><input id="q" maxlength="200">
+  <div class="g" style="margin-top:6px"><div><label>SOURCE</label><select id="src"><option value="both">Wikipedia + Hacker News</option><option value="wikipedia">Wikipedia</option><option value="hackernews">Hacker News</option></select></div>
+  <div><label>LANGUAGE</label><select id="lang"><option>fr</option><option>en</option></select></div>
+  <div><label>DEPTH</label><select id="dep"><option value="4">QUICK</option><option value="7" selected>STANDARD</option><option value="12">DEEP</option></select></div></div>
+  <div class="row" style="margin-top:12px"><button class="pr" onclick="investigate()">START INVESTIGATION</button><span id="ist" class="pill ${status?"pulse":""}">${status||"IDLE"}</span></div></div>
+  <div id="ires">${lastReport?repHTML(lastReport):""}</div>`;
+},
+memory(){
+  return `<h2>Memory</h2><p class="sub">Stockée sur cet appareil. Jamais envoyée en bloc à Mistral.</p>
+  <div class="c"><textarea id="mc" rows="2" placeholder="Nouvelle mémoire"></textarea><div class="row" style="margin-top:8px"><select id="mcat" style="width:auto">${CATS.map(c=>`<option>${c}</option>`).join("")}</select>
+  <select id="mimp" style="width:auto">${[1,2,3,4,5].map(n=>`<option ${n===3?"selected":""} value="${n}">Importance ${n}</option>`).join("")}</select><button class="pr" onclick="memAdd()">Ajouter</button></div></div>
+  <input id="ms" placeholder="Rechercher" oninput="memList()" style="margin-bottom:12px"><div id="ml">${memItems("")}</div>
+  <div class="row"><button onclick="dl('sentinel-memoire.json',JSON.stringify(DB.mem,null,2),'application/json')">Exporter</button><button class="dg" onclick="if(confirm('Vider toute la mémoire ?')){DB.mem=[];save();log('MEMORY CLEARED','MEMORY');render()}">Vider</button></div>`;
+},
+alerts(){
+  return `<h2>Alerts</h2><p class="sub">Veille sur sujets suivis (Hacker News, plus récents d'abord). Les alertes sont des signaux d'information, pas des menaces confirmées.</p>
+  <div class="c"><div class="row" style="flex-wrap:nowrap"><input id="wt" maxlength="80" placeholder="Sujet à surveiller (ex. vulnérabilité iOS)"><button onclick="watchAdd()">Ajouter</button></div>
+  <div class="row" style="margin-top:8px">${DB.watch.map((w,i)=>`<span class="pill">${esc(w)} <a href="#" onclick="DB.watch.splice(${i},1);save();render();return false">✕</a></span>`).join("")||`<span class="mono">Aucun sujet.</span>`}</div>
+  <div class="row" style="margin-top:10px"><button class="pr" onclick="watchCheck()">Vérifier maintenant</button><span id="wst" class="mono"></span></div></div>
+  ${DB.alerts.slice().reverse().map(a=>`<div class="c" style="${a.done?"opacity:.5":""}"><span class="tag ${a.level}">${a.level}</span> <span class="mono">${esc(a.date||"")} · ${esc(a.topic)}</span>
+   <div style="margin:6px 0">${esc(a.title)}</div><a href="${esc(safeUrl(a.url))}" target="_blank" rel="noopener noreferrer">Source</a>
+   <div class="row" style="margin-top:6px"><select style="width:auto" onchange="lvl('${a.id}',this.value)">${LV.map(l=>`<option ${l===a.level?"selected":""}>${l}</option>`).join("")}</select>
+   <button onclick="alDone('${a.id}')">${a.done?"Réactiver":"Traiter"}</button></div></div>`).join("")}`;
+},
+reports(){
+  return `<h2>Reports</h2>`+(DB.reports.slice().reverse().map(r=>`<div class="c"><b>${esc(r.query)}</b><div class="mono">${esc(r.ts)}</div>
+  <div class="row" style="margin-top:8px"><button onclick="lastReport=DB.reports.find(x=>x.id==='${r.id}');go('invest')">Ouvrir</button><button class="dg" onclick="DB.reports=DB.reports.filter(x=>x.id!=='${r.id}');save();render()">Supprimer</button></div></div>`).join("")||`<p class="sub">Aucun rapport. Lancez une investigation.</p>`);
+},
+settings(){
+  const s=DB.set;
+  return `<h2>Settings</h2><div class="c"><h3>AI</h3>
+  <label>Mistral API Key</label><input id="sk" type="password" autocomplete="off" value="${esc(s.key)}" placeholder="Stockée uniquement sur cet appareil">
+  <label>Model</label><input id="sm" value="${esc(s.model)}"><label>Temperature</label><input id="st" type="number" step="0.1" min="0" max="1" value="${s.temp}">
+  <label>Max tokens</label><input id="sx" type="number" min="100" max="4000" value="${s.max}">
+  <label><input type="checkbox" id="sd" style="width:auto;min-height:0" ${s.demo?"checked":""}> Mode DEMO (données fictives, sans API)</label>
+  <div class="row" style="margin-top:12px"><button class="pr" onclick="setSave()">Enregistrer</button></div>
+  <p class="mono">Sans serveur, la clé est lue par le navigateur pour appeler Mistral. Ne la partagez pas et utilisez une clé à budget limité.</p></div>
+  <div class="c"><h3>DATA</h3><div class="row"><button onclick="dl('sentinel-donnees.json',JSON.stringify({...DB,set:{...DB.set,key:''}},null,2),'application/json')">EXPORT DATA</button>
+  <button onclick="document.getElementById('imp').click()">IMPORT DATA</button><input id="imp" type="file" accept=".json" hidden onchange="imp(this)">
+  <button class="dg" onclick="if(confirm('Supprimer TOUTES les données locales ?')&&confirm('Dernière confirmation : action définitive.')){localStorage.removeItem(KEY);DB=structuredClone(DEF);go('dash')}">DELETE ALL DATA</button></div></div>
+  <div class="c"><h3>SECURITY LOG</h3><div class="mono" style="max-height:220px;overflow:auto">${DB.log.slice(-40).reverse().map(l=>`<div>${esc(l.ts.slice(11,19))} ${esc(l.action)} · ${esc(l.module)} · ${esc(l.result)} · ${esc(l.status)}</div>`).join("")||"Vide."}</div>
+  <div class="row" style="margin-top:8px"><button onclick="dl('sentinel-audit.json',JSON.stringify(DB.log,null,2),'application/json')">Exporter le journal</button></div></div>`;
+}};
+
+/* ---------- Actions : chat ---------- */
+async function sendChat(regen){
+  let q;
+  if(regen){while(DB.msgs.length&&DB.msgs.at(-1).role==="assistant")DB.msgs.pop();q=DB.msgs.at(-1)?.content}
+  else{const i=$("#ci");q=i.value.trim();if(!q)return;DB.msgs.push({role:"user",content:q})}
+  if(!q)return;
+  status="ANALYZING";render();log("CHAT STARTED","AI");
+  const mem=recall(q);
+  const sys="Tu es SENTINEL, agent de sécurité personnelle et de veille. Réponds dans la langue de l'utilisateur, de façon concise. N'invente jamais de faits, distingue faits et hypothèses, ne prétends pas qu'une menace est réelle sans preuve."+(mem.length?"\nMémoires pertinentes :\n"+mem.map(m=>"- "+m.content).join("\n"):"");
+  try{
+    const a=await mistral([{role:"system",content:sys},...DB.msgs.slice(-8).map(m=>({role:m.role,content:m.content}))]);
+    DB.msgs.push({role:"assistant",content:a});log("AI ANSWER","AI",mem.length+" mémoire(s) utilisée(s)");
+  }catch(e){DB.msgs.push({role:"assistant",content:"⚠ "+e.message});log("AI ERROR","AI",e.message,"ERROR")}
+  status="";save();render();
+}
+const cp=i=>navigator.clipboard?.writeText(DB.msgs[i].content);
+const saveMsg=i=>{addMem(DB.msgs[i].content,"CONVERSATIONS","chat");alert("Enregistré en mémoire.")};
+function msgReport(i){const q=DB.msgs[i-1]?.content||"Chat";lastReport={id:uid(),ts:new Date().toISOString(),query:q,summary:DB.msgs[i].content,findings:[],timeline:[],unverified:[],verify:[],sources:[]};DB.reports.push(lastReport);save();go("invest")}
+
+/* ---------- Actions : investigation ---------- */
+async function investigate(){
+  const q=$("#q").value.trim();if(!q)return;
+  const set=t=>{status=t;const e=$("#ist");if(e){e.textContent=t||"IDLE";e.classList.toggle("pulse",!!t)}};
+  try{
+    set("SEARCHING");log("WEB SEARCH STARTED","WEB",q);
+    const src=await webSearch(q,$("#src").value,+$("#dep").value,$("#lang").value);
+    log(src.length+" SOURCES FOUND","WEB");
+    if(!src.length){set("");$("#ires").innerHTML=`<div class="c">Aucune source trouvée. Reformulez la requête.</div>`;return}
+    set("ANALYZING SOURCES");log("AI ANALYSIS STARTED","AI");
+    const list=src.map((s,i)=>`S${i+1} | ${s.source} | ${s.date||"?"} | ${s.title} | ${s.snippet}`).join("\n");
+    const raw=await mistral([{role:"system",content:"Tu analyses des sources web. Réponds UNIQUEMENT en JSON : {\"summary\":str,\"findings\":[{\"text\":str,\"type\":\"FACT|CLAIM|OPINION|UNVERIFIED|CONTRADICTED\",\"confidence\":0-100,\"reason\":str,\"sources\":[numéros]}],\"timeline\":[{\"date\":str,\"event\":str}],\"unverified\":[str],\"verify\":[str]}. Ne déduis rien qui n'est pas dans les extraits, signale les contradictions et les dates anciennes. Réponds dans la langue de la question."},
+      {role:"user",content:"Question : "+q+"\nSources :\n"+list}],true);
+    set("VERIFYING");
+    let j;try{j=JSON.parse(raw.slice(raw.indexOf("{"),raw.lastIndexOf("}")+1))}catch{throw new Error("Réponse Mistral invalide (JSON illisible).")}
+    const T=["FACT","CLAIM","OPINION","UNVERIFIED","CONTRADICTED"];
+    lastReport={id:uid(),ts:new Date().toISOString(),query:q,summary:String(j.summary||""),
+      findings:(j.findings||[]).map(f=>({text:String(f.text||""),type:T.includes(f.type)?f.type:"UNVERIFIED",confidence:Math.max(0,Math.min(100,+f.confidence||0)),reason:String(f.reason||""),sources:(f.sources||[]).map(Number).filter(n=>n>=1&&n<=src.length)})),
+      timeline:(j.timeline||[]).map(t=>({date:String(t.date||""),event:String(t.event||"")})),unverified:(j.unverified||[]).map(String),verify:(j.verify||[]).map(String),sources:src};
+    DB.reports.push(lastReport);log("REPORT GENERATED","REPORTS");save();set("");
+    $("#ires").innerHTML=repHTML(lastReport);
+  }catch(e){set("");log("INVESTIGATION ERROR","AI",e.message,"ERROR");$("#ires").innerHTML=errBox(e)}
+}
+function repHTML(r){
+  return `<div class="c"><h3>INTELLIGENCE REPORT · ${esc(r.ts.slice(0,16).replace("T"," "))}</h3><b>${esc(r.query)}</b><p>${esc(r.summary)}</p>
+  ${r.findings.map(f=>`<div class="msg"><span class="tag ${f.type}">${f.type}</span> <span class="mono">CONFIDENCE ${f.confidence}%</span><div>${esc(f.text)}</div><div class="mono">Reason : ${esc(f.reason)} ${f.sources.map(n=>"[S"+n+"]").join("")}</div></div>`).join("")}
+  ${r.timeline.length?`<h3 style="margin-top:12px">TIMELINE</h3><div class="tl">${r.timeline.map(t=>`<div><span class="mono">${esc(t.date)}</span> ${esc(t.event)}</div>`).join("")}</div>`:""}
+  ${r.unverified.length?`<h3 style="margin-top:12px">UNVERIFIED</h3>${r.unverified.map(u=>`<div>• ${esc(u)}</div>`).join("")}`:""}
+  ${r.verify.length?`<h3 style="margin-top:12px">TO VERIFY</h3>${r.verify.map(u=>`<div>• ${esc(u)}</div>`).join("")}`:""}
+  ${r.sources.length?`<h3 style="margin-top:12px">SOURCES USED : ${r.sources.length}</h3>${r.sources.map((s,i)=>`<div class="src">S${i+1} ${esc(s.source)} · ${esc(s.date)} · <a href="${esc(safeUrl(s.url))}" target="_blank" rel="noopener noreferrer">${esc(s.title)}</a></div>`).join("")}`:""}
+  <div class="row noprint" style="margin-top:12px"><button onclick="dl('rapport.md',mdOf(lastReport))">Markdown</button><button onclick="dl('rapport.txt',txtOf(lastReport))">TXT</button><button onclick="dl('rapport.json',JSON.stringify(lastReport,null,2),'application/json')">JSON</button><button onclick="window.print()">PDF</button></div></div>`;
+}
+
+/* ---------- Actions : mémoire, alertes, réglages ---------- */
+function memItems(f){
+  const l=DB.mem.filter(m=>!f||(m.content+m.category).toLowerCase().includes(f.toLowerCase())).slice().reverse();
+  return l.map(m=>`<div class="c"><span class="tag">${m.category}</span> <span class="mono">importance ${m.importance} · ${esc(m.created.slice(0,10))} · ${esc(m.source)}</span><div style="margin:6px 0;white-space:pre-wrap;overflow-wrap:anywhere">${esc(m.content)}</div>
+  <div class="row"><button onclick="memEdit('${m.id}')">Modifier</button><button class="dg" onclick="DB.mem=DB.mem.filter(x=>x.id!=='${m.id}');save();log('MEMORY DELETED','MEMORY');memList()">Supprimer</button></div></div>`).join("")||`<p class="sub">Aucune mémoire.</p>`;
+}
+const memList=()=>{$("#ml").innerHTML=memItems($("#ms").value)};
+function memAdd(){const c=$("#mc").value.trim();if(!c)return;addMem(c,$("#mcat").value,"manuel",+$("#mimp").value);render()}
+function memEdit(id){const m=DB.mem.find(x=>x.id===id),v=prompt("Modifier la mémoire",m.content);if(v!==null&&v.trim()){m.content=v.trim().slice(0,2000);save();memList()}}
+function watchAdd(){const v=$("#wt").value.trim();if(v&&!DB.watch.includes(v)){DB.watch.push(v);save();render()}}
+async function watchCheck(){
+  const st=$("#wst");let added=0;
+  try{
+    for(const t of DB.watch){
+      st.textContent="SEARCHING : "+t;
+      const r=await webSearch(t,"hackernews",5,"fr",true);
+      for(const s of r)if(!DB.alerts.some(a=>a.url===s.url)){DB.alerts.push({id:uid(),level:"INFO",topic:t,title:s.title,url:s.url,date:s.date,done:false});added++}
+    }
+    log("WATCH CHECK","ALERTS",added+" nouveau(x)");save();render();
+  }catch(e){st.textContent="⚠ "+e.message}
+}
+const lvl=(id,v)=>{DB.alerts.find(a=>a.id===id).level=v;save();render()};
+const alDone=id=>{const a=DB.alerts.find(x=>x.id===id);a.done=!a.done;save();render()};
+function setSave(){
+  const t=Math.max(0,Math.min(1,+$("#st").value||0)),x=Math.max(100,Math.min(4000,+$("#sx").value||1200));
+  DB.set={key:$("#sk").value.trim(),model:$("#sm").value.trim()||"mistral-small-latest",temp:t,max:x,demo:$("#sd").checked};
+  save();log("SETTINGS SAVED","SETTINGS");nav();render();
+}
+function imp(inp){
+  const f=inp.files[0];if(!f)return;const r=new FileReader();
+  r.onload=()=>{try{const d=JSON.parse(r.result);delete d.set;DB=Object.assign(structuredClone(DEF),DB,d);save();log("DATA IMPORTED","SETTINGS");render()}catch{alert("Fichier invalide.")}};
+  r.readAsText(f);
+}
+
+/* ---------- Démarrage ---------- */
+addEventListener("online",render);addEventListener("offline",render);
+nav();render();
+</script>
+</body>
+</html>
